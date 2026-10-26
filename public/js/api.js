@@ -108,6 +108,7 @@ export const api = {
   deleteDiscoverSource: (id) =>
     request(`/api/discover/sources/${encodeURIComponent(id)}`, { method: "DELETE" }),
   liveSources: () => request("/api/live/sources"),
+  loadBuiltinLive: () => request("/api/live/builtin", { method: "POST", timeoutMs: 30000 }),
   addLiveSource: (payload) =>
     request("/api/live/sources", { method: "POST", body: payload, timeoutMs: 30000 }),
   deleteLiveSource: (id) =>

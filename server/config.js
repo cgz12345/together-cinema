@@ -120,6 +120,12 @@ export const config = {
   })(),
   discoveryTimeoutMs: Number(process.env.DISCOVERY_TIMEOUT_MS || 15000),
 
+  // One-click built-in live TV source. Override with your own m3u URL if the
+  // public list is unreachable from your server.
+  builtinLiveName: process.env.BUILTIN_LIVE_NAME || "内置 · 央卫",
+  builtinLiveList:
+    process.env.BUILTIN_LIVE_LIST || "https://iptv-org.github.io/iptv/countries/cn.m3u",
+
   userAgent:
     process.env.USER_AGENT ||
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

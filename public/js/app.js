@@ -440,7 +440,7 @@ function renderHome() {
         <div class="hero-copy">
           <div class="eyebrow">${icon("sparkles")} 异地恋的专属放映室</div>
           <h1>把链接变成<br><span class="gradient-text">两个人的同屏夜晚</span></h1>
-          <p class="hero-sub">粘贴视频页链接，自动嗅探高清播放地址。同步播放、自由倍速、原画画质、实时聊天——距离很远，屏幕很近。</p>
+          <p class="hero-sub">粘贴视频页或直播页链接，自动嗅探真实播放地址。同步播放、自由倍速、原画画质、实时聊天——距离很远，屏幕很近。</p>
           <div class="feature-row">
             <span class="feature-pill">${icon("monitor-play")} 原画画质</span>
             <span class="feature-pill">${icon("refresh")} 毫秒级同步</span>
@@ -463,10 +463,10 @@ function renderHome() {
           </div>
           <div class="create-card">
             <div class="card-title">开始一场只属于你们的放映</div>
-            <label class="field-label" for="url-input">影片链接</label>
+            <label class="field-label" for="url-input">影片 / 直播链接</label>
             <div class="input-with-icon">
               ${icon("link")}
-              <input id="url-input" class="input" type="url" placeholder="粘贴视频页链接，或 .m3u8 / .mp4 直链" autocomplete="off" spellcheck="false">
+              <input id="url-input" class="input" type="url" placeholder="视频页 / 直播页 / m3u8 / mp4 直链" autocomplete="off" spellcheck="false">
             </div>
             <details class="advanced">
               <summary>需要登录？可选填 Cookie</summary>
@@ -501,7 +501,7 @@ function renderHome() {
         <div class="how-card">
           <span class="how-num">01</span>
           <h3>粘贴链接</h3>
-          <p>支持视频页链接和 m3u8 / mp4 直链。服务器会嗅探页面里的真实播放地址，并代理防盗链。</p>
+          <p>支持视频页、直播页和 m3u8 / mp4 直链。服务器会嗅探页面里的真实播放地址，并代理防盗链。</p>
         </div>
         <div class="how-card">
           <span class="how-num">02</span>
@@ -1180,6 +1180,11 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
     type: "button",
     html: `${icon("settings")} 管理直播源`,
   });
+  const builtinButton = el("button", {
+    class: "link-btn",
+    type: "button",
+    html: `${icon("sparkles")} 内置源`,
+  });
   const statusNode = el("div", { class: "discover-status" });
   const channelsNode = el("div", { class: "live-channels" });
   const body = el(
@@ -1193,7 +1198,7 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
         class: "discover-hint",
         text: mode === "change" ? "点一个频道，房间里马上换台。" : "点频道就能和 TA 一起看直播；同一列表里的频道可以在房间里互相换台。",
       }),
-      manageButton,
+      el("div", { class: "settings-inline" }, builtinButton, manageButton),
     ),
     statusNode,
     channelsNode,
@@ -1289,10 +1294,24 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
   const load = async () => {
     channelsNode.innerHTML = "";
     channelsNode.append(el("div", { class: "discover-status", text: "正在读取直播源…" }));
+    let loadError = "";
     try {
       const data = await withAccess(() => api.liveSources());
       sources = Array.isArray(data.sources) ? data.sources : [];
+      if (!sources.length) {
+        // First run: fetch the built-in public TV list server-side so the
+        // viewer can click a channel immediately instead of importing an m3u.
+        channelsNode.innerHTML = "";
+        channelsNode.append(el("div", { class: "discover-status", text: "首次使用，正在加载内置直播源…" }));
+        try {
+          const built = await withAccess(() => api.loadBuiltinLive());
+          sources = Array.isArray(built.sources) ? built.sources : [];
+        } catch (error) {
+          loadError = error.message || "内置直播源加载失败，可以手动导入 m3u";
+        }
+      }
       render();
+      if (loadError) setStatus(loadError, true);
     } catch (error) {
       channelsNode.innerHTML = "";
       channelsNode.append(
@@ -1311,6 +1330,19 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
       load();
     }),
   );
+  builtinButton.addEventListener("click", async () => {
+    builtinButton.disabled = true;
+    setStatus("正在加载内置直播源…");
+    try {
+      const data = await withAccess(() => api.loadBuiltinLive());
+      sources = Array.isArray(data.sources) ? data.sources : sources;
+      render();
+    } catch (error) {
+      setStatus(error.message || "内置直播源加载失败，可以手动导入 m3u", true);
+    } finally {
+      builtinButton.disabled = false;
+    }
+  });
   input.addEventListener("input", render);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

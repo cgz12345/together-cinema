@@ -64,6 +64,8 @@ ALLOW_PRIVATE_URLS=1 npm start
 | `MAX_UPLOAD_BYTES` | `6291456` | 聊天图片最大字节数 |
 | `ICE_SERVERS` | 公共 STUN | WebRTC ICE 配置 JSON；严格 NAT 建议加 TURN |
 | `SNIFFER_URL` | 空 | 可选的外部浏览器嗅探服务地址 |
+| `BUILTIN_LIVE_LIST` | iptv-org 中国列表 | “看电视”内置源的 m3u 地址，首次打开时服务端抓取并缓存 |
+| `BUILTIN_LIVE_NAME` | `内置 · 央卫` | 内置直播源显示名称 |
 | `MERGE_ENABLED` | `0` | 预留：高清合并（未启用） |
 
 ## 部署（Ubuntu + systemd + Caddy）
@@ -160,6 +162,14 @@ Caddy 会自动申请 Let's Encrypt 证书。确认 80/443 端口在云厂商安
 ### 直播 / IPTV
 
 “看电视”里可以粘贴 m3u 文本、填写列表链接或添加单个频道。频道列表存在 `DATA_DIR/live-sources.json`，不上传到第三方。直播不支持倍速和精确拖动。
+
+首次打开且没有任何直播源时，会自动从 `BUILTIN_LIVE_LIST`（默认是 iptv-org 的中国频道列表）导入一份内置源，点频道即可开播或换台。也可以随时点“内置源”重新加载。服务器访问不了该地址时，用环境变量换成自己的 m3u 链接：
+
+```env
+BUILTIN_LIVE_LIST=https://example.com/iptv/cn.m3u
+```
+
+主输入框也支持直播：直接粘贴 m3u8、直播页链接，或没有后缀的直播地址（服务端会尝试把输入地址当作媒体流探测）。
 
 ### 连麦
 

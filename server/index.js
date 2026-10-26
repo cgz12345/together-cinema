@@ -355,6 +355,24 @@ app.get(
   }),
 );
 
+// One-click built-in source. The public IPTV list is fetched server-side and
+// cached in live-sources.json, so clients never depend on GitHub directly.
+app.post(
+  "/api/live/builtin",
+  requireAccess,
+  apiLimit(discoveryLimiter),
+  wrap(async (req, res) => {
+    const existing = live.list().find((source) => source.name === config.builtinLiveName);
+    if (existing) {
+      res.json({ source: existing, sources: live.list(), cached: true });
+      return;
+    }
+    const channels = await fetchLiveList(config.builtinLiveList);
+    const source = live.add(config.builtinLiveName, channels);
+    res.status(201).json({ source, sources: live.list(), cached: false });
+  }),
+);
+
 app.post(
   "/api/live/sources",
   requireAccess,
