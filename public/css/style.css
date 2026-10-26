@@ -4253,34 +4253,67 @@ video::cue {
 }
 
 .live-grid {
-  max-height: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  align-content: start;
+  max-height: 52vh;
 }
 
 .live-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 9px 11px;
+  border-radius: 12px;
+  text-align: left;
+  gap: 9px;
+}
+
+.live-logo,
+.live-logo-fallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex: none;
 }
 
 .live-logo {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
   object-fit: contain;
   background: rgba(255, 255, 255, 0.08);
-  flex: none;
+}
+
+.live-logo-fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #ff6b9d, #7c3aed);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.live-chip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .live-chip-name {
   font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .live-chip-group {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--muted-2);
-  padding-left: 8px;
-  border-left: 1px solid var(--line);
+  padding-left: 0;
+  border-left: 0;
 }
 
 /* 导入弹窗 */

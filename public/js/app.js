@@ -1145,6 +1145,16 @@ function liveHeadersFor(channel) {
   return headers;
 }
 
+/** Short label for a channel without a usable logo. */
+function channelInitial(name) {
+  const text = String(name || "").trim();
+  const cctv = /^CCTV[-\s]*(\d+)/i.exec(text);
+  if (cctv) return `C${cctv[1]}`;
+  const ascii = text.match(/[A-Za-z0-9]+/);
+  if (ascii) return ascii[0].slice(0, 2).toUpperCase();
+  return text.slice(0, 2) || "TV";
+}
+
 /** 从任意地方（首页/房间里）用直链开一间直播房。 */
 async function openDirectRoom(url, extra = {}) {
   const name = await getSelfName();
@@ -1249,13 +1259,36 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
       );
       const grid = el("div", { class: "episode-list live-grid" });
       for (const channel of channels) {
+        const fallback = el("span", {
+          class: "live-logo-fallback",
+          text: channelInitial(channel.name),
+          "aria-hidden": "true",
+        });
+        let logoNode = fallback;
         const logo = safeImageUrl(channel.logo);
+        if (logo) {
+          const img = el("img", {
+            class: "live-logo",
+            src: logo,
+            alt: "",
+            loading: "lazy",
+            referrerpolicy: "no-referrer",
+          });
+          img.addEventListener("error", () => img.replaceWith(fallback), { once: true });
+          logoNode = img;
+        }
         const card = el(
           "button",
           { class: "episode-chip live-chip", type: "button", title: channel.url },
-          logo ? el("img", { class: "live-logo", src: logo, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : null,
-          el("span", { class: "live-chip-name", text: channel.name }),
-          channel.group ? el("span", { class: "live-chip-group", text: channel.group }) : null,
+          logoNode,
+          el(
+            "span",
+            { class: "live-chip-text" },
+            el("span", { class: "live-chip-name", text: channel.name }),
+            channel.group
+              ? el("span", { class: "live-chip-group", text: channel.group })
+              : null,
+          ),
         );
         card.addEventListener("click", () => {
           if (mode === "change") {

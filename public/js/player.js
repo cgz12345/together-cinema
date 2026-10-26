@@ -419,7 +419,9 @@ export class Player {
     if (!this.videoData || !this.proxySrc || !this.usingDirect) return;
     const time = this.video.currentTime || 0;
     const wasPlaying = !this.video.paused;
-    this.callbacks.onTransientError?.(message);
+    // Live channels usually have no CORS. A failed direct attempt there is
+    // expected, so don't interrupt the viewer with a toast before falling back.
+    if (!this.videoData.isLive) this.callbacks.onTransientError?.(message);
     this.usingDirect = false;
     const data = this.videoData;
     this.load(data, { forceProxy: true }).then(() => {
@@ -429,20 +431,21 @@ export class Player {
   }
 
   initHls(videoData) {
+    const isLive = Boolean(videoData.isLive);
     const hls = new Hls({
       enableWorker: true,
       lowLatencyMode: false,
       capLevelToPlayerSize: false,
       startLevel: -1,
-      maxBufferLength: 40,
-      maxMaxBufferLength: 90,
-      backBufferLength: 60,
+      maxBufferLength: isLive ? 24 : 40,
+      maxMaxBufferLength: isLive ? 48 : 90,
+      backBufferLength: isLive ? 10 : 60,
       abrEwmaDefaultEstimate: 8_000_000,
       manifestLoadingTimeOut: 25000,
       levelLoadingTimeOut: 25000,
       fragLoadingTimeOut: 35000,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 8,
+      liveSyncDurationCount: isLive ? 2 : 3,
+      liveMaxLatencyDurationCount: isLive ? 5 : 8,
     });
     this.hls = hls;
     hls.attachMedia(this.video);

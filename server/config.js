@@ -120,11 +120,11 @@ export const config = {
   })(),
   discoveryTimeoutMs: Number(process.env.DISCOVERY_TIMEOUT_MS || 15000),
 
-  // One-click built-in live TV source. Override with your own m3u URL if the
-  // public list is unreachable from your server.
-  builtinLiveName: process.env.BUILTIN_LIVE_NAME || "内置 · 央卫",
-  builtinLiveList:
-    process.env.BUILTIN_LIVE_LIST || "https://iptv-org.github.io/iptv/countries/cn.m3u",
+  // Curated direct-play live channels are built in. Set BUILTIN_LIVE_LIST to
+  // import a full external m3u list instead (channels that can't use CORS will
+  // fall back to the server proxy).
+  builtinLiveName: process.env.BUILTIN_LIVE_NAME || "内置 · 精选直连",
+  builtinLiveList: process.env.BUILTIN_LIVE_LIST || "",
 
   userAgent:
     process.env.USER_AGENT ||

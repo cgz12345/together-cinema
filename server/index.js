@@ -22,6 +22,7 @@ import {
 import { Resolver } from "./resolver.js";
 import { Discovery } from "./discovery.js";
 import { LiveTV, parseM3U, fetchLiveList } from "./live.js";
+import { BUILTIN_LIVE_CHANNELS } from "./builtin-live.js";
 import { RoomManager } from "./rooms.js";
 import { attachWebSocket } from "./ws.js";
 import { createStreamHandlers } from "./proxy.js";
@@ -351,23 +352,39 @@ app.get(
   "/api/live/sources",
   requireAccess,
   wrap(async (req, res) => {
+    // Remove the old 149-channel built-in list on upgrade; the UI will then
+    // auto-load the curated direct-play source.
+    const legacy = live.list().find(
+      (source) => source.name === "内置 · 央卫" && source.channels.length > 30,
+    );
+    if (legacy) live.remove(legacy.id);
     res.json({ sources: live.list(), totalChannels: live.totalChannels() });
   }),
 );
 
-// One-click built-in source. The public IPTV list is fetched server-side and
-// cached in live-sources.json, so clients never depend on GitHub directly.
+// One-click built-in source. Without BUILTIN_LIVE_LIST this is a curated,
+// CORS-tested HTTPS list; with it, the server imports the external m3u.
 app.post(
   "/api/live/builtin",
   requireAccess,
   apiLimit(discoveryLimiter),
   wrap(async (req, res) => {
+    // Migrate the old 149-channel public-list source to the curated one.
+    const legacy = live.list().find(
+      (source) => source.name === "内置 · 央卫" && source.channels.length > 30,
+    );
+    if (legacy) live.remove(legacy.id);
+    const external = Boolean(config.builtinLiveList);
+    const expectedCount = external ? 0 : BUILTIN_LIVE_CHANNELS.length;
     const existing = live.list().find((source) => source.name === config.builtinLiveName);
-    if (existing) {
+    if (existing && (!expectedCount || existing.channels.length === expectedCount)) {
       res.json({ source: existing, sources: live.list(), cached: true });
       return;
     }
-    const channels = await fetchLiveList(config.builtinLiveList);
+    if (existing) live.remove(existing.id);
+    const channels = external
+      ? await fetchLiveList(config.builtinLiveList)
+      : BUILTIN_LIVE_CHANNELS;
     const source = live.add(config.builtinLiveName, channels);
     res.status(201).json({ source, sources: live.list(), cached: false });
   }),
