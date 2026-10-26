@@ -2925,7 +2925,9 @@ function bindRoomControls() {
     if (!state.video) return;
     if (!refs.stageOverlay.hidden) return;
     // 点画面只切控件显隐，不暂停。误触一下就把片子停掉太烦人。
+    // 普通房间隐藏后也必须能点回来，否则找不到倍速/清晰度。
     if (isFullscreenActive()) toggleStageControls();
+    else if (refs.stage.classList.contains("controls-hidden")) showStageControls();
   });
 
   // 鼠标/手指一动就把控件唤回来，停 3 秒不动再自动收起。
@@ -2938,7 +2940,7 @@ function bindRoomControls() {
     // 立刻收控件会让紧接着合成的 click 落空——用户点播放/全屏按钮没反应。
     // 触摸场景交给 3.2s 不动定时器去收，鼠标划出画面才立即收。
     if (event.pointerType === "touch") return;
-    if (isFullscreenActive() && state.video && !refs.video?.paused) hideStageControls();
+    if (state.video && !refs.video?.paused) hideStageControls();
   });
 
   refs.controls.addEventListener("pointerdown", () => showStageControls());
@@ -3175,6 +3177,8 @@ function bindStageGestures() {
       if (isFullscreenActive()) toggleStageControls();
       else if (state.video && !refs.stageOverlay.hidden) {
         refs.btnBigPlay?.click();
+      } else if (refs.stage?.classList.contains("controls-hidden")) {
+        showStageControls();
       }
     }
     start = null;
@@ -3955,12 +3959,6 @@ function toggleStageControls() {
 function hideStageControls() {
   clearTimeout(controlsHideTimer);
   if (!refs.stage) return;
-  // Keep controls persistent in the normal room layout so quality/speed are
-  // always discoverable; only fullscreen gets the clean auto-hiding chrome.
-  if (!isFullscreenActive()) {
-    refs.stage.classList.remove("controls-hidden");
-    return;
-  }
   refs.stage.classList.add("controls-hidden");
 }
 
@@ -3972,7 +3970,6 @@ function showStageControls({ keep = false } = {}) {
   if (keep) return;
   // 暂停时控件常驻，别让用户对着隐藏的进度条发呆
   if (refs.video?.paused) return;
-  if (!isFullscreenActive()) return;
   controlsHideTimer = setTimeout(() => {
     if (refs.video && !refs.video.paused && !state.dragging) hideStageControls();
   }, 3200);
