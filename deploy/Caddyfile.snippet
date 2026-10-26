@@ -1,0 +1,16 @@
+# Append this site block to /etc/caddy/Caddyfile and replace the hostname
+# with a domain (or an sslip.io hostname) that points to this server.
+#
+# Caddy obtains and renews a Let's Encrypt certificate automatically, provided
+# ports 80/443 are reachable.
+
+watch.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3010 {
+		flush_interval -1
+	}
+	# Live-source imports accept a pasted 2 MB m3u and use a 3 MB JSON body.
+	request_body {
+		max_size 4MB
+	}
+}

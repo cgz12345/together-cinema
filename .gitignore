@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.*
+!.env.example
+data/
+.tmp/
+*.log
+.DS_Store
+*.tgz
+server-backup-*/
+public/*-backup-*/
+public/js-backup-*/
+.npm/
+coverage/
+testdata/hls/*.ts
+*.pem
+*.key

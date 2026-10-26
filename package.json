@@ -1,0 +1,35 @@
+{
+  "name": "together-cinema",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Self-hosted two-person cinema: stream sniffing, synced playback, chat, live TV, voice and PWA.",
+  "keywords": [
+    "watch-party",
+    "video",
+    "hls",
+    "webrtc",
+    "self-hosted"
+  ],
+  "homepage": "https://github.com/cgz12345/together-cinema#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cgz12345/together-cinema.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cgz12345/together-cinema/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.3"
+  }
+}

@@ -1,0 +1,31 @@
+[Unit]
+Description=Two-person watch party (Together Cinema)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=watchparty
+Group=watchparty
+WorkingDirectory=/opt/watchparty
+EnvironmentFile=/opt/watchparty/.env
+Environment=HOME=/opt/watchparty/data/home
+Environment=TMPDIR=/opt/watchparty/data/tmp
+ExecStart=/opt/node/bin/node server/index.js
+Restart=always
+RestartSec=3
+Nice=5
+LimitNOFILE=65536
+
+# Hardening (keep the app directory read-only except runtime data).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/watchparty/data
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
