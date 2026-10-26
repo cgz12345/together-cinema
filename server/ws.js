@@ -30,6 +30,10 @@ function clearBufferTimer(room) {
     clearTimeout(room.bufferTimer);
     room.bufferTimer = null;
   }
+  if (room.bufferingCheckTimer) {
+    clearTimeout(room.bufferingCheckTimer);
+    room.bufferingCheckTimer = null;
+  }
 }
 
 function broadcastPlayback(room, action, extra = {}) {
@@ -245,6 +249,7 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
             duration: null,
             localPath: null,
           });
+          clearBufferTimer(room);
           room.play(0);
           broadcast(room, {
             type: "video",
@@ -381,12 +386,16 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
               title: typeof message.title === "string" ? message.title : "",
               poster: typeof message.poster === "string" ? message.poster : "",
             });
+            // A new movie replaces the previous show, including its episode
+            // playlist; otherwise "next episode" would jump into the old show.
+            room.playlist = [];
+            room.playlistIndex = 0;
             room.setVideo(
               video,
               resolvedStore.describeSource(message.token, message.candidateId),
             );
             clearBufferTimer(room);
-            broadcast(room, { type: "video", video });
+            broadcast(room, { type: "video", video, playlist: null });
             broadcastPlayback(room, "video");
             const chat = room.addSystem(`${member.name} 添加了《${video.title}》`);
             broadcast(room, { type: "chat", message: chat });
