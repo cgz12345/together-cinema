@@ -146,8 +146,13 @@ export function toast(message, { type = "info", duration = 3200 } = {}) {
   while (root.children.length > 4) root.firstElementChild?.remove();
 }
 
-export function openModal({ title, body, actions = [], wide = false, closable = true, onClose = null }) {
+/** Hard-reset stacked dialogs before a view change (e.g. entering a room). */
+export function closeAllModals() {
   const root = document.getElementById("modal-root");
+  if (root) root.replaceChildren();
+}
+
+export function openModal({ title, body, actions = [], wide = false, closable = true, onClose = null }) {  const root = document.getElementById("modal-root");
   if (!root) return null;
   const backdrop = el("div", { class: "modal-backdrop" });
   const modal = el("div", {

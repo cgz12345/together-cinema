@@ -15,6 +15,7 @@ import {
   formatDuration,
   initials,
   safeImageUrl,
+  closeAllModals,
 } from "./ui.js";
 import { clamp, parseHash, navigate } from "./utils.js";
 
@@ -2166,6 +2167,7 @@ function startResolve({
 // ---------------------------------------------------------------------------
 
 async function enterRoom(code) {
+  closeAllModals();
   cleanupRoom();
   state.view = "room";
   state.code = code;
@@ -2936,7 +2938,7 @@ function bindRoomControls() {
     // 立刻收控件会让紧接着合成的 click 落空——用户点播放/全屏按钮没反应。
     // 触摸场景交给 3.2s 不动定时器去收，鼠标划出画面才立即收。
     if (event.pointerType === "touch") return;
-    if (state.video && !refs.video?.paused) hideStageControls();
+    if (isFullscreenActive() && state.video && !refs.video?.paused) hideStageControls();
   });
 
   refs.controls.addEventListener("pointerdown", () => showStageControls());
@@ -3953,6 +3955,12 @@ function toggleStageControls() {
 function hideStageControls() {
   clearTimeout(controlsHideTimer);
   if (!refs.stage) return;
+  // Keep controls persistent in the normal room layout so quality/speed are
+  // always discoverable; only fullscreen gets the clean auto-hiding chrome.
+  if (!isFullscreenActive()) {
+    refs.stage.classList.remove("controls-hidden");
+    return;
+  }
   refs.stage.classList.add("controls-hidden");
 }
 
@@ -3964,6 +3972,7 @@ function showStageControls({ keep = false } = {}) {
   if (keep) return;
   // 暂停时控件常驻，别让用户对着隐藏的进度条发呆
   if (refs.video?.paused) return;
+  if (!isFullscreenActive()) return;
   controlsHideTimer = setTimeout(() => {
     if (refs.video && !refs.video.paused && !state.dragging) hideStageControls();
   }, 3200);
