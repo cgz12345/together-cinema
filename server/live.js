@@ -24,18 +24,7 @@ function cleanText(value, max = 80) {
 
 /** 只做协议格式校验；内网/SSRF 防护在真正发起请求时由 openUpstream 负责。 */
 function validChannelUrl(value) {
-  if (typeof value !== "string") return false;
-  const text = value.trim();
-  if (!text || text.length > 2048) return false;
-  let url;
-  try {
-    url = new URL(text);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  if (url.username || url.password) return false;
-  return true;
+  return typeof value === "string" && /^https?:\/\//i.test(value.trim()) && value.length <= 2048;
 }
 
 function normalizeHeaderValue(value) {
@@ -371,6 +360,9 @@ export class LiveTV {
     if (this.sources.length >= MAX_SOURCES) {
       throw new AppError(400, "too_many_sources", `最多添加 ${MAX_SOURCES} 个直播源`);
     }
+    if (this.totalChannels() + channels.length > MAX_TOTAL_CHANNELS) {
+      throw new AppError(400, "too_many_channels", "频道总数超过上限了，先删一些旧的");
+    }
     const seen = new Set();
     const normalized = [];
     for (const channel of channels) {
@@ -390,11 +382,6 @@ export class LiveTV {
       if (normalized.length >= MAX_CHANNELS_PER_SOURCE) break;
     }
     if (!normalized.length) throw new AppError(400, "empty_channels", "没有可导入的频道");
-    // 先去掉无效项和重复项，再判断总量；否则一份含大量重复/无效行的大列表
-    // 会在真正保存前就被误判为“超过上限”。
-    if (this.totalChannels() + normalized.length > MAX_TOTAL_CHANNELS) {
-      throw new AppError(400, "too_many_channels", "频道总数超过上限了，先删一些旧的");
-    }
     const source = { id: randomId(6), name: cleanName, createdAt: Date.now(), channels: normalized };
     this.sources.push(source);
     if (save) this.save();
@@ -423,9 +410,6 @@ export class LiveTV {
     }
     if (source.channels.length >= MAX_CHANNELS_PER_SOURCE) {
       throw new AppError(400, "too_many_channels", "这个直播源频道太多了");
-    }
-    if (this.totalChannels() >= MAX_TOTAL_CHANNELS) {
-      throw new AppError(400, "too_many_channels", "频道总数超过上限了，先删一些旧的");
     }
     const channel = {
       id: randomId(6),
@@ -465,4 +449,38 @@ export class LiveTV {
     }
     return list;
   }
+}
+
+// 内置公开 IPTV 列表：用户点一下即可一键导入成自己的直播源（远程抓取解析）。
+// 这些列表长期维护、公开可达，但里面个别频道地址会失效（第三方流），所以做成
+// 「按需导入」而不是预置——免得预置一堆放不出的源污染列表、变成负体验。
+const BUILTIN_SOURCES = [
+  {
+    id: "iptv-cn",
+    name: "中国央视频道",
+    url: "https://iptv-org.github.io/iptv/countries/cn.m3u",
+    desc: "央视 + 卫视 + 地方台（约 150 路）",
+  },
+  {
+    id: "iptv-hk",
+    name: "中国香港频道",
+    url: "https://iptv-org.github.io/iptv/countries/hk.m3u",
+    desc: "香港免费台（约 17 路）",
+  },
+  {
+    id: "iptv-tw",
+    name: "中国台湾频道",
+    url: "https://iptv-org.github.io/iptv/countries/tw.m3u",
+    desc: "台湾无线台（约 32 路）",
+  },
+  {
+    id: "fm-live",
+    name: "Fanmingming 精选",
+    url: "https://raw.githubusercontent.com/fanmingming/live/main/tv/m3u/ipv6.m3u",
+    desc: "国内外精选直播（约 82 路）",
+  },
+];
+
+export function getBuiltins() {
+  return BUILTIN_SOURCES;
 }

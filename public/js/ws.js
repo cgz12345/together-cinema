@@ -1,11 +1,10 @@
 export class RoomSocket {
-  constructor({ code, token, onMessage, onStatus, onAuthLost, onOpen }) {
+  constructor({ code, token, onMessage, onStatus, onAuthLost }) {
     this.code = code;
     this.token = token;
     this.onMessage = onMessage;
     this.onStatus = onStatus || (() => {});
     this.onAuthLost = onAuthLost || (() => {});
-    this.onOpen = onOpen || (() => {});
     this.ws = null;
     this.closed = false;
     this.attempts = 0;
@@ -55,7 +54,6 @@ export class RoomSocket {
       this.onStatus("open");
       this.send("ping", { t: Date.now() });
       this.startHeartbeat();
-      this.onOpen();
     });
 
     ws.addEventListener("message", (event) => {

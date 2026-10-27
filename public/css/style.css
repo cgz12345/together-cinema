@@ -3452,6 +3452,28 @@ body.fs-lock {
   color: var(--text-dim, rgba(255, 255, 255, 0.45));
 }
 
+/* 邀请链接：窄屏下完整换行显示，而不是被 input 的窄框裁掉。
+   用 div 而非 input——长 URL 在 readonly input 里横向溢出且移动端无法拖动查看。 */
+.invite-link-box {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  word-break: break-all;
+  line-height: 1.5;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.settings-name-row .input {
+  max-width: 260px;
+}
+
 /* 全屏时点画面收起控件，别让一排按钮一直压着画面 */
 .stage.controls-hidden .controls,
 .stage.controls-hidden .stage-badges {
@@ -3462,6 +3484,17 @@ body.fs-lock {
 .stage .controls,
 .stage .stage-badges {
   transition: opacity 0.2s ease;
+}
+
+/* host 控制模式下观众端：共享控件弱化显示，但点得动——点了会弹
+   「向主持人申请 / 只有主持人可以控制」的提示，比灰按钮没反应清楚 */
+.stage.readonly #btn-play,
+.stage.readonly #btn-back10,
+.stage.readonly #btn-fwd10,
+.stage.readonly #btn-speed,
+.stage.readonly .seek-wrap,
+.stage.readonly .time {
+  opacity: 0.45;
 }
 
 /* 全屏聊天：收起按钮 + 收起后的气泡 */
@@ -4253,67 +4286,34 @@ video::cue {
 }
 
 .live-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px;
-  align-content: start;
-  max-height: 52vh;
+  max-height: none;
 }
 
 .live-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  width: 100%;
-  justify-content: flex-start;
-  padding: 9px 11px;
-  border-radius: 12px;
-  text-align: left;
-  gap: 9px;
-}
-
-.live-logo,
-.live-logo-fallback {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  flex: none;
+  gap: 8px;
+  padding: 7px 12px;
 }
 
 .live-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   object-fit: contain;
   background: rgba(255, 255, 255, 0.08);
-}
-
-.live-logo-fallback {
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #ff6b9d, #7c3aed);
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.live-chip-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
+  flex: none;
 }
 
 .live-chip-name {
   font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .live-chip-group {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--muted-2);
-  padding-left: 0;
-  border-left: 0;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
 }
 
 /* 导入弹窗 */
@@ -4353,4 +4353,20 @@ video::cue {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* 直播态：天上是同步的，暂停键 / 进度条 / ±10s / 时间显示全部隐藏 */
+.stage.is-live .seek-wrap,
+.stage.is-live #btn-play,
+.stage.is-live #btn-back10,
+.stage.is-live #btn-fwd10,
+.stage.is-live .time {
+  display: none;
+}
+
+.live-builtins {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
 }

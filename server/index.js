@@ -21,8 +21,7 @@ import {
 } from "./sessions.js";
 import { Resolver } from "./resolver.js";
 import { Discovery } from "./discovery.js";
-import { LiveTV, parseM3U, fetchLiveList } from "./live.js";
-import { BUILTIN_LIVE_CHANNELS } from "./builtin-live.js";
+import { LiveTV, parseM3U, fetchLiveList, getBuiltins } from "./live.js";
 import { RoomManager } from "./rooms.js";
 import { attachWebSocket } from "./ws.js";
 import { createStreamHandlers } from "./proxy.js";
@@ -58,8 +57,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 直播源导入支持直接粘贴 2MB 的 m3u 文本，JSON 转义后要留出余量。
-app.use(express.json({ limit: "3mb" }));
+app.use(express.json({ limit: "320kb" }));
 
 const sessionStore = new SessionStore();
 const resolvedStore = new ResolvedStore(sessionStore);
@@ -352,41 +350,16 @@ app.get(
   "/api/live/sources",
   requireAccess,
   wrap(async (req, res) => {
-    // Remove the old 149-channel built-in list on upgrade; the UI will then
-    // auto-load the curated direct-play source.
-    const legacy = live.list().find(
-      (source) => source.name === "内置 · 央卫" && source.channels.length > 30,
-    );
-    if (legacy) live.remove(legacy.id);
     res.json({ sources: live.list(), totalChannels: live.totalChannels() });
   }),
 );
 
-// One-click built-in source. Without BUILTIN_LIVE_LIST this is a curated,
-// CORS-tested HTTPS list; with it, the server imports the external m3u.
-app.post(
-  "/api/live/builtin",
+// 内置公开 IPTV 列表，给「导入直播源」弹窗当一键导入入口（不预置到用户源里）。
+app.get(
+  "/api/live/builtins",
   requireAccess,
-  apiLimit(discoveryLimiter),
   wrap(async (req, res) => {
-    // Migrate the old 149-channel public-list source to the curated one.
-    const legacy = live.list().find(
-      (source) => source.name === "内置 · 央卫" && source.channels.length > 30,
-    );
-    if (legacy) live.remove(legacy.id);
-    const external = Boolean(config.builtinLiveList);
-    const expectedCount = external ? 0 : BUILTIN_LIVE_CHANNELS.length;
-    const existing = live.list().find((source) => source.name === config.builtinLiveName);
-    if (existing && (!expectedCount || existing.channels.length === expectedCount)) {
-      res.json({ source: existing, sources: live.list(), cached: true });
-      return;
-    }
-    if (existing) live.remove(existing.id);
-    const channels = external
-      ? await fetchLiveList(config.builtinLiveList)
-      : BUILTIN_LIVE_CHANNELS;
-    const source = live.add(config.builtinLiveName, channels);
-    res.status(201).json({ source, sources: live.list(), cached: false });
+    res.json({ sources: getBuiltins() });
   }),
 );
 
@@ -400,9 +373,6 @@ app.post(
     if (Array.isArray(req.body?.channels)) {
       channels = req.body.channels;
     } else if (typeof req.body?.text === "string") {
-      if (Buffer.byteLength(req.body.text, "utf8") > 2 * 1024 * 1024) {
-        throw new AppError(413, "list_too_large", "直播列表超过 2MB，请用列表链接导入");
-      }
       channels = parseM3U(req.body.text);
     } else if (typeof req.body?.url === "string" && req.body.url.trim()) {
       channels = await fetchLiveList(req.body.url);
@@ -478,8 +448,9 @@ app.post(
       if (referer && /^https?:\/\//i.test(referer) && referer.length <= 512) headers.referer = referer;
     }
     // 点播直链顺手探一下是不是直播流（没有 ENDLIST 就是直播）：直播间会被
-    // 位置同步反复 seek 打脸，探一次比让用户看着卡好。探不到就按直播算，
-    // 国内直播 CDN 从海外服务器经常探不到，但浏览器直连大多能放。
+    // 位置同步反复 seek 打脸，探一次比让用户看着卡好。探不到就按点播算，
+    // 直链建房的主流场景是影视站，误判直播的代价（倍速/位置同步全禁）
+    // 比误判点播大。
     let isLive = liveMode;
     if (!liveMode && /\.m3u8(?:$|[?#])/i.test(url)) {
       isLive = await detectLiveFromM3u8(url);
@@ -526,7 +497,7 @@ app.post(
 /**
  * 抓 m3u8 判断是直播还是点播。
  * 注意 master playlist（#EXT-X-STREAM-INF）本身永远没有 ENDLIST，不能据此
- * 判直播——要顺着第一个子列表再看一层；子列表探不到（地区屏蔽常见）就按
+ * 判直播——要顺着第一个子列表再看一层；探不到（防盗链/地区屏蔽常见）就按
  * 点播算，影视站的 master 直链才是这个函数的主要服务对象。
  */
 async function detectLiveFromM3u8(url, depth = 0) {
@@ -538,12 +509,17 @@ async function detectLiveFromM3u8(url, depth = 0) {
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      // 地址存在但拿不到内容（防盗链/地区限制）：国内直播 CDN 从海外经常
-      // 这样，按直播算，免得位置同步把用户反复 seek 打脸。
-      return true;
+      // 拿不到内容：防盗链 / 地区限制 / CDN 限流都可能。直链建房的主流
+      // 场景是影视点播，误判直播会禁掉倍速和位置同步，代价比误判点播
+      // 大（直播流最多被 seek 打几下，播放不中断）。真要直播请走直播
+      // 导入入口（那里显式传 live=true，不依赖探测）。
+      return false;
     }
     const { buffer } = await readResponseLimited(response, 64 * 1024);
     const text = buffer.toString("utf8");
+    // 防盗链经常返回 HTML 错误页而不是 m3u8：没有 ENDLIST 会误判直播，
+    // 先按 #EXTM3U 头验明正身。
+    if (!/^\s*#EXTM3U/.test(text)) return false;
     if (/#EXT-X-PLAYLIST-TYPE:\s*VOD/i.test(text)) return false;
     const master = /#EXT-X-STREAM-INF/i.test(text);
     if (master) {

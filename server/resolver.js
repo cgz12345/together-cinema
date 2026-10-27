@@ -594,37 +594,6 @@ export class Resolver {
       hints.push(`网页嗅探：${error.message}`);
     }
 
-    // Some live endpoints have no .m3u8 suffix (e.g. /live/channel/123).
-    // Try the typed URL itself as a media stream before falling back to the
-    // headless browser. `#probeMedia` handles both HLS and direct video.
-    try {
-      report("probe", "尝试把输入地址当作直播/直链读取…");
-      const cookie = cookieHeaderForHost(cookies, host);
-      const candidate = await this.#probeMedia(pageUrl, {
-        Referer: new URL(pageUrl).origin + "/",
-        "User-Agent": config.userAgent,
-        ...(cookie ? { Cookie: cookie } : {}),
-      });
-      if (candidate) {
-        const title = decodeURIComponent(
-          new URL(pageUrl).pathname.split("/").filter(Boolean).pop() || host,
-        );
-        return this.#store(
-          this.#buildResult({
-            pageUrl,
-            title: title.replace(/\.[a-z0-9]{2,5}$/i, "") || host,
-            poster: null,
-            duration: candidate.duration,
-            isLive: candidate.isLive,
-            candidates: [candidate],
-            note: candidate.isLive ? "直播" : "输入地址可直接播放",
-          }),
-        );
-      }
-    } catch (error) {
-      hints.push(`直链探测：${error.message}`);
-    }
-
     if (!known) {
       report("ytdlp", "调用 yt-dlp 兜底解析…");
       try {
@@ -1088,12 +1057,6 @@ export class Resolver {
         throw new AppError(422, "not_hls", "返回内容不是 HLS 播放列表");
       }
       const parsed = parseHlsPlaylist(text, finalUrl);
-      // A master playlist has no ENDLIST itself. Probe its first variant so a
-      // live master (very common for IPTV) isn't misclassified as VOD.
-      const isLive =
-        parsed.isMaster && parsed.variants[0]?.url
-          ? await this.#probeLiveVariant(parsed.variants[0].url, headers)
-          : parsed.isLive;
       const qualities = parsed.variants
         .map((variant) => ({
           label: variant.height ? `${variant.height}P` : variant.name || "自动",
@@ -1110,18 +1073,14 @@ export class Resolver {
         height: parsed.height,
         bandwidth: parsed.bandwidth,
         duration: parsed.duration,
-        isLive,
+        isLive: parsed.isLive,
         qualities,
         label: parsed.height
           ? `${parsed.height}P · HLS`
           : parsed.isMaster
             ? "HLS · 多码率"
             : "HLS · 原始画质",
-        note: parsed.isMaster
-          ? `${parsed.variants.length} 档码率${isLive ? " · 直播" : ""}`
-          : isLive
-            ? "直播"
-            : "",
+        note: parsed.isMaster ? `${parsed.variants.length} 档码率` : parsed.isLive ? "直播" : "",
       };
     }
 
@@ -1176,29 +1135,6 @@ export class Resolver {
       label: `${ext.toUpperCase()} · 原始画质`,
       note: size ? `${Math.round(size / 1024 / 1024)}MB` : "",
     };
-  }
-
-  async #probeLiveVariant(url, headers) {
-    try {
-      const { response } = await openUpstream(url, {
-        headers: { ...headers, "accept-encoding": "identity" },
-        timeoutMs: 8000,
-        maxRedirects: 3,
-      });
-      if (!response.ok) {
-        // Some live CDNs deny overseas server IPs while still working in the
-        // viewer's browser; treat an inaccessible child as live.
-        await response.body?.cancel().catch(() => {});
-        return true;
-      }
-      const contentType = response.headers.get("content-type") || "";
-      const { buffer } = await readResponseLimited(response, 512 * 1024);
-      const text = decodeBuffer(buffer, contentType);
-      if (/#EXT-X-PLAYLIST-TYPE:\s*VOD/i.test(text)) return false;
-      return !/#EXT-X-ENDLIST/i.test(text);
-    } catch {
-      return false;
-    }
   }
 
   async #ytdlp(url, cookies) {

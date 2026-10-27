@@ -207,11 +207,7 @@ class Room {
     this.sleptAt = 0;
     this.wokeAt = Date.now();
     this.lastActive = Date.now();
-    // If the room was woken by a guest, the host is still offline. Keep the
-    // timestamp so "claim host" can work after the 60s cooldown instead of
-    // waiting forever for a host that may not come back.
-    const host = this.getHost();
-    this.hostOfflineSince = host && !host.online ? this.hostOfflineSince || Date.now() : null;
+    this.hostOfflineSince = null;
     return true;
   }
 
@@ -258,6 +254,7 @@ class Room {
     for (const item of this.members.values()) item.isHost = item.id === member.id;
     this.hostId = member.id;
     this.hostOfflineSince = null;
+    this.addSystem(`${member.name} 成为了主持人`);
     return true;
   }
 

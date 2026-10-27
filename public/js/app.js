@@ -15,7 +15,6 @@ import {
   formatDuration,
   initials,
   safeImageUrl,
-  closeAllModals,
 } from "./ui.js";
 import { clamp, parseHash, navigate } from "./utils.js";
 
@@ -441,7 +440,7 @@ function renderHome() {
         <div class="hero-copy">
           <div class="eyebrow">${icon("sparkles")} 异地恋的专属放映室</div>
           <h1>把链接变成<br><span class="gradient-text">两个人的同屏夜晚</span></h1>
-          <p class="hero-sub">粘贴视频页或直播页链接，自动嗅探真实播放地址。同步播放、自由倍速、原画画质、实时聊天——距离很远，屏幕很近。</p>
+          <p class="hero-sub">粘贴视频页链接，自动嗅探高清播放地址。同步播放、自由倍速、原画画质、实时聊天——距离很远，屏幕很近。</p>
           <div class="feature-row">
             <span class="feature-pill">${icon("monitor-play")} 原画画质</span>
             <span class="feature-pill">${icon("refresh")} 毫秒级同步</span>
@@ -464,10 +463,10 @@ function renderHome() {
           </div>
           <div class="create-card">
             <div class="card-title">开始一场只属于你们的放映</div>
-            <label class="field-label" for="url-input">影片 / 直播链接</label>
+            <label class="field-label" for="url-input">影片链接</label>
             <div class="input-with-icon">
               ${icon("link")}
-              <input id="url-input" class="input" type="url" placeholder="视频页 / 直播页 / m3u8 / mp4 直链" autocomplete="off" spellcheck="false">
+              <input id="url-input" class="input" type="url" placeholder="粘贴视频页链接，或 .m3u8 / .mp4 直链" autocomplete="off" spellcheck="false">
             </div>
             <details class="advanced">
               <summary>需要登录？可选填 Cookie</summary>
@@ -478,7 +477,7 @@ function renderHome() {
             <div class="or-line"><span>或者</span></div>
             <button id="btn-create-empty" class="btn btn-ghost btn-block" type="button">${icon("plus")} 先开一间空放映室</button>
             <button id="btn-discover" class="btn btn-ghost btn-block" type="button">${icon("search")} 找片 · 从资源站搜索</button>
-            <button id="btn-live" class="btn btn-ghost btn-block" type="button">${icon("monitor-play")} 看电视 · 直播频道</button>
+            <button id="btn-live" class="btn btn-ghost btn-block" type="button">${icon("monitor-play")} 看直播 · 电视频道</button>
           </div>
         </div>
       </section>
@@ -502,7 +501,7 @@ function renderHome() {
         <div class="how-card">
           <span class="how-num">01</span>
           <h3>粘贴链接</h3>
-          <p>支持视频页、直播页和 m3u8 / mp4 直链。服务器会嗅探页面里的真实播放地址，并代理防盗链。</p>
+          <p>支持视频页链接和 m3u8 / mp4 直链。服务器会嗅探页面里的真实播放地址，并代理防盗链。</p>
         </div>
         <div class="how-card">
           <span class="how-num">02</span>
@@ -1146,16 +1145,6 @@ function liveHeadersFor(channel) {
   return headers;
 }
 
-/** Short label for a channel without a usable logo. */
-function channelInitial(name) {
-  const text = String(name || "").trim();
-  const cctv = /^CCTV[-\s]*(\d+)/i.exec(text);
-  if (cctv) return `C${cctv[1]}`;
-  const ascii = text.match(/[A-Za-z0-9]+/);
-  if (ascii) return ascii[0].slice(0, 2).toUpperCase();
-  return text.slice(0, 2) || "TV";
-}
-
 /** 从任意地方（首页/房间里）用直链开一间直播房。 */
 async function openDirectRoom(url, extra = {}) {
   const name = await getSelfName();
@@ -1191,11 +1180,6 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
     type: "button",
     html: `${icon("settings")} 管理直播源`,
   });
-  const builtinButton = el("button", {
-    class: "link-btn",
-    type: "button",
-    html: `${icon("sparkles")} 内置源`,
-  });
   const statusNode = el("div", { class: "discover-status" });
   const channelsNode = el("div", { class: "live-channels" });
   const body = el(
@@ -1209,13 +1193,13 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
         class: "discover-hint",
         text: mode === "change" ? "点一个频道，房间里马上换台。" : "点频道就能和 TA 一起看直播；同一列表里的频道可以在房间里互相换台。",
       }),
-      el("div", { class: "settings-inline" }, builtinButton, manageButton),
+      manageButton,
     ),
     statusNode,
     channelsNode,
   );
   const modal = openModal({
-    title: "看电视",
+    title: "电视直播",
     body,
     wide: true,
     actions: [{ label: "关闭", kind: "ghost" }],
@@ -1260,36 +1244,13 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
       );
       const grid = el("div", { class: "episode-list live-grid" });
       for (const channel of channels) {
-        const fallback = el("span", {
-          class: "live-logo-fallback",
-          text: channelInitial(channel.name),
-          "aria-hidden": "true",
-        });
-        let logoNode = fallback;
         const logo = safeImageUrl(channel.logo);
-        if (logo) {
-          const img = el("img", {
-            class: "live-logo",
-            src: logo,
-            alt: "",
-            loading: "lazy",
-            referrerpolicy: "no-referrer",
-          });
-          img.addEventListener("error", () => img.replaceWith(fallback), { once: true });
-          logoNode = img;
-        }
         const card = el(
           "button",
           { class: "episode-chip live-chip", type: "button", title: channel.url },
-          logoNode,
-          el(
-            "span",
-            { class: "live-chip-text" },
-            el("span", { class: "live-chip-name", text: channel.name }),
-            channel.group
-              ? el("span", { class: "live-chip-group", text: channel.group })
-              : null,
-          ),
+          logo ? el("img", { class: "live-logo", src: logo, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : null,
+          el("span", { class: "live-chip-name", text: channel.name }),
+          channel.group ? el("span", { class: "live-chip-group", text: channel.group }) : null,
         );
         card.addEventListener("click", () => {
           if (mode === "change") {
@@ -1328,24 +1289,10 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
   const load = async () => {
     channelsNode.innerHTML = "";
     channelsNode.append(el("div", { class: "discover-status", text: "正在读取直播源…" }));
-    let loadError = "";
     try {
       const data = await withAccess(() => api.liveSources());
       sources = Array.isArray(data.sources) ? data.sources : [];
-      if (!sources.length) {
-        // First run: fetch the built-in public TV list server-side so the
-        // viewer can click a channel immediately instead of importing an m3u.
-        channelsNode.innerHTML = "";
-        channelsNode.append(el("div", { class: "discover-status", text: "首次使用，正在加载内置直播源…" }));
-        try {
-          const built = await withAccess(() => api.loadBuiltinLive());
-          sources = Array.isArray(built.sources) ? built.sources : [];
-        } catch (error) {
-          loadError = error.message || "内置直播源加载失败，可以手动导入 m3u";
-        }
-      }
       render();
-      if (loadError) setStatus(loadError, true);
     } catch (error) {
       channelsNode.innerHTML = "";
       channelsNode.append(
@@ -1364,19 +1311,6 @@ function openLiveTV({ mode = "create", onPicked = null } = {}) {
       load();
     }),
   );
-  builtinButton.addEventListener("click", async () => {
-    builtinButton.disabled = true;
-    setStatus("正在加载内置直播源…");
-    try {
-      const data = await withAccess(() => api.loadBuiltinLive());
-      sources = Array.isArray(data.sources) ? data.sources : sources;
-      render();
-    } catch (error) {
-      setStatus(error.message || "内置直播源加载失败，可以手动导入 m3u", true);
-    } finally {
-      builtinButton.disabled = false;
-    }
-  });
   input.addEventListener("input", render);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -1577,6 +1511,54 @@ function openLiveImport(onImported) {
     }),
   );
 
+  // 方式四：内置公开 IPTV 列表，点一下一键导入
+  const builtinList = el("div", { class: "live-builtins" });
+  const builtinPanel = el(
+    "div",
+    { class: "live-import-panel" },
+    el("p", {
+      class: "settings-hint",
+      text: "这些是长期维护的公开 IPTV 列表，点「导入」即可抓取并解析成你的直播源。个别频道地址可能失效（第三方流），导入后挑能看的看即可。",
+    }),
+    builtinList,
+  );
+  const refreshBuiltins = async () => {
+    builtinList.innerHTML = "";
+    try {
+      const data = await withAccess(() => api.liveBuiltins());
+      for (const item of data.sources || []) {
+        const button = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "导入" });
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          button.textContent = "导入中…";
+          try {
+            const res = await withAccess(() => api.addLiveSource({ name: item.name, url: item.url }));
+            toast(`已导入「${item.name}」，共 ${res.source?.channels?.length || 0} 个频道`, { type: "success" });
+            onImported?.();
+          } catch (error) {
+            errorNode.textContent = error.message || "导入失败";
+          } finally {
+            button.disabled = false;
+            button.textContent = "导入";
+          }
+        });
+        builtinList.append(
+          el(
+            "div",
+            { class: "source-row" },
+            el("div", { class: "source-row-main" },
+              el("span", { class: "source-row-name", text: item.name }),
+              el("span", { class: "source-row-api", text: item.desc || item.url }),
+            ),
+            button,
+          ),
+        );
+      }
+    } catch {
+      builtinList.append(el("p", { class: "modal-text", text: "拉取内置源失败，稍后再试。" }));
+    }
+  };
+
   const refreshSourceSelect = async () => {
     sourceSelect.innerHTML = "";
     sourceSelect.append(el("option", { value: "__new__", text: "新建直播源（用频道名）" }));
@@ -1591,12 +1573,13 @@ function openLiveImport(onImported) {
   };
 
   let activePanel = "text";
-  const panels = { text: textPanel, url: urlPanel, single: singlePanel };
+  const panels = { text: textPanel, url: urlPanel, single: singlePanel, builtin: builtinPanel };
   const tabBar = el("div", { class: "live-import-tabs" });
   const tabs = [
     { key: "text", label: "粘贴列表" },
     { key: "url", label: "列表链接" },
     { key: "single", label: "单个频道" },
+    { key: "builtin", label: "内置源" },
   ];
   const paintTabs = () => {
     tabBar.innerHTML = "";
@@ -1632,6 +1615,7 @@ function openLiveImport(onImported) {
     textPanel,
     urlPanel,
     singlePanel,
+    builtinPanel,
     errorNode,
   );
   const modal = openModal({
@@ -1644,6 +1628,7 @@ function openLiveImport(onImported) {
   paintTabs();
   paintPanel();
   refreshSourceSelect();
+  refreshBuiltins();
 }
 
 /** 直播源管理：删源、删频道、往已有源里加频道。 */
@@ -2167,7 +2152,6 @@ function startResolve({
 // ---------------------------------------------------------------------------
 
 async function enterRoom(code) {
-  closeAllModals();
   cleanupRoom();
   state.view = "room";
   state.code = code;
@@ -2220,11 +2204,6 @@ function connectSocket() {
     onMessage: handleSocketMessage,
     onStatus: handleSocketStatus,
     onAuthLost: rejoinRoom,
-    // The server clears member.voice when the socket drops. If the mic was
-    // already on, announce it again after a reconnect and re-negotiate peers.
-    onOpen: () => {
-      if (state.voice?.enabled) state.ws?.send("voiceOn", {});
-    },
   });
   state.ws.connect();
   if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
@@ -2391,6 +2370,9 @@ function handleSocketMessage(message) {
       state.settings = message.settings || state.settings;
       updateSettingsUI();
       updatePermissions();
+      // 「主持人控制中」徽章在 updatePartnerStatus 里渲染，不补刷的话
+      // 切模式后对方要等下一条消息才看到变化。
+      updatePartnerStatus();
       break;
     case "controlRequest":
       // 只有主持人才该收到。弹出批准/拒绝。
@@ -2435,6 +2417,8 @@ function handleVideoChange(video) {
   }
   state.loadedVideoId = video.id;
   state.player?.load(video);
+  // 直播首播：建房/换台后自动尝试开播，被浏览器策略拦截由 onAutoplayBlocked 兜底
+  if (video.isLive) state.player?.tryPlay();
   updateNowPlaying();
   updatePlaybackUI();
   renderRoomTitle();
@@ -2470,6 +2454,7 @@ function applyRoomState(roomState, { initial = false } = {}) {
     if (state.loadedVideoId !== roomState.video.id) {
       state.loadedVideoId = roomState.video.id;
       state.player?.load(roomState.video);
+      if (roomState.video?.isLive) state.player?.tryPlay();
     }
     updateNowPlaying();
     updatePlaybackUI();
@@ -2576,7 +2561,7 @@ function renderRoomShell() {
           <div class="under-actions">
             <button class="btn btn-ghost btn-sm" id="btn-skip-intro" type="button">${icon("refresh")} 同步</button>
             <button class="btn btn-ghost btn-sm" id="btn-discover-room" type="button">${icon("search")} 找片</button>
-            <button class="btn btn-ghost btn-sm" id="btn-live-room" type="button">${icon("monitor-play")} 看电视</button>
+            <button class="btn btn-ghost btn-sm" id="btn-live-room" type="button">${icon("monitor-play")} 电视频道</button>
             <button class="btn btn-ghost btn-sm" id="btn-add-video" type="button">${icon("plus")} 添加影片</button>
             <button class="btn btn-ghost btn-sm" id="btn-next-episode" type="button" hidden>${icon("film")} 选集</button>
             <input type="file" id="subtitle-input" accept=".srt,.vtt,text/vtt" hidden>
@@ -2703,7 +2688,9 @@ function renderRoomShell() {
       updateSpeedButton();
     },
     onAutoplayBlocked: () => {
-      showStageOverlay("点击加入同步播放");
+      // 直播态不讲究“同步”，点一下本地开播即可
+      if (state.video?.isLive) showStageOverlay("点击播放直播", { showPlay: true });
+      else showStageOverlay("点击加入同步播放");
     },
     onError: (message) => {
       refs.stageLoading.hidden = true;
@@ -2885,7 +2872,18 @@ function bindRoomControls() {
 
   refs.seek.addEventListener("input", () => {
     if (!state.video) return;
-    if (!canControl()) return;
+    if (!canControl()) {
+      // 拖动是连续事件：提示加冷却，别把 toast 刷成屏。申请动作留给
+      // change（松手）那一发，这里只解释为什么拖不动。
+      if (!seekHintShown) {
+        seekHintShown = true;
+        toast(needsRequest() ? "已向主持人申请，等 TA 同意" : "当前只有主持人可以控制播放", { type: "info" });
+        setTimeout(() => {
+          seekHintShown = false;
+        }, 2000);
+      }
+      return;
+    }
     state.dragging = true;
     state.player.beginSeek();
     const duration = refs.video.duration || state.video.duration || 0;
@@ -2924,15 +2922,28 @@ function bindRoomControls() {
     if (event.target.closest(".controls, .badge, button, input, .fs-chat, .fs-chat-bubble")) return;
     if (!state.video) return;
     if (!refs.stageOverlay.hidden) return;
+    // 直播态：点画面直接本地播放（首播/恢复）。天上是同步的，暂停键和
+    // 进度条在直播态都被隐藏，点画面就是唯一的开播入口。
+    if (state.video.isLive && refs.video?.paused) {
+      state.player?.forcePlay?.();
+      return;
+    }
     // 点画面只切控件显隐，不暂停。误触一下就把片子停掉太烦人。
-    // 普通房间隐藏后也必须能点回来，否则找不到倍速/清晰度。
+    // 不全全屏时控件也会自动收起（3.2s 不动），触摸设备没有 hover，
+    // 收起之后点画面必须能唤回来，不然播放/全屏按钮直接失联。
     if (isFullscreenActive()) toggleStageControls();
-    else if (refs.stage.classList.contains("controls-hidden")) showStageControls();
+    else showStageControls();
   });
 
   // 鼠标/手指一动就把控件唤回来，停 3 秒不动再自动收起。
   // 不全屏时也一样：进度条不该一直占着画面。
   refs.stage.addEventListener("pointermove", () => {
+    if (state.video) showStageControls();
+  });
+  // 触摸设备点画面不一定派发 pointermove，但 pointerdown 一定有：
+  // 收起的控件靠它唤回，避免手机上控件隐藏后点哪儿都没反应。
+  refs.stage.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".controls, .badge, button, input, .fs-chat, .fs-chat-bubble")) return;
     if (state.video) showStageControls();
   });
   refs.stage.addEventListener("pointerleave", (event) => {
@@ -3177,8 +3188,6 @@ function bindStageGestures() {
       if (isFullscreenActive()) toggleStageControls();
       else if (state.video && !refs.stageOverlay.hidden) {
         refs.btnBigPlay?.click();
-      } else if (refs.stage?.classList.contains("controls-hidden")) {
-        showStageControls();
       }
     }
     start = null;
@@ -3299,9 +3308,8 @@ function srtToVtt(text) {
 
 async function loadSubtitleFile(file) {
   if (!file) return;
-  // Keep the raw VTT (plus JSON escaping) under the 2MB WS payload limit.
-  if (file.size > 900 * 1024) {
-    toast("字幕文件太大了（限制 900KB）", { type: "error" });
+  if (file.size > 2 * 1024 * 1024) {
+    toast("字幕文件太大了（限制 2MB）", { type: "error" });
     return;
   }
   try {
@@ -3535,6 +3543,8 @@ function updatePlayButton() {
 
 function updatePlaybackUI() {
   const video = state.video;
+  // 直播态挂 is-live：CSS 据此隐藏暂停键 / 进度条 / ±10s（天上是同步的，用不上）
+  refs.stage?.classList.toggle("is-live", Boolean(video?.isLive));
   const duration = refs.video?.duration || video?.duration || 0;
   // 直播流的 duration 通常是 Infinity，格式化成 "0:00" 会误导，优先显示“直播”
   refs.timeTotal.textContent =
@@ -3647,12 +3657,22 @@ function updateMembersUI() {
 function updatePermissions() {
   if (!refs.btnPlay) return;
   const allowed = canControl();
+  // 无影片时才禁用；host 模式下观众端**不**禁用共享控件——点了由 handler
+  // 走「向主持人申请 / 只有主持人可以控制」的提示路径，比一个点着没
+  // 反应的灰按钮清楚得多。readonly class 只负责弱化视觉。
   refs.btnPlay.disabled = !state.video;
-  refs.seek.disabled = !state.video || !allowed;
-  refs.btnSpeed.disabled = !state.video || !allowed || Boolean(state.video?.isLive);
-  refs.btnBack10.disabled = !state.video || !allowed;
-  refs.btnFwd10.disabled = !state.video || !allowed;
+  refs.seek.disabled = !state.video;
+  refs.btnBack10.disabled = !state.video;
+  refs.btnFwd10.disabled = !state.video;
+  refs.btnSpeed.disabled = !state.video || Boolean(state.video?.isLive);
   refs.btnQuality.disabled = !state.video;
+  if (refs.btnSpeed) {
+    refs.btnSpeed.title = state.video?.isLive
+      ? "直播流不支持倍速"
+      : allowed
+        ? "播放速度"
+        : "当前只有主持人可以控制倍速";
+  }
   refs.stage?.classList.toggle("readonly", !allowed);
 }
 
@@ -3946,6 +3966,7 @@ function handleKeyboard(event) {
 }
 
 let controlsHideTimer = 0;
+let seekHintShown = false;
 
 /** 全屏时点一下画面：有控件就收起，没有就显示。 */
 function toggleStageControls() {
@@ -4184,10 +4205,9 @@ function invite() {
     });
   });
 
-  const linkInput = el("input", {
-    class: "input code-readonly",
-    value: url,
-    readonly: true,
+  const linkBox = el("div", {
+    class: "invite-link-box",
+    text: url,
     "aria-label": "邀请链接",
   });
   const linkButton = el("button", {
@@ -4213,7 +4233,7 @@ function invite() {
       "div",
       { class: "invite-block" },
       el("div", { class: "invite-label", text: "邀请链接" }),
-      linkInput,
+      linkBox,
       access
         ? el("div", { class: "invite-hint", text: `通行码 ${access}，复制链接时会一起带上` })
         : null,
@@ -4347,11 +4367,30 @@ function openSettings() {
     modal.close();
     leaveRoom();
   });
+  const nameInput = el("input", {
+    class: "input",
+    type: "text",
+    maxLength: 24,
+    value: state.me?.name || storedName(),
+    placeholder: "给自己起个名字",
+    "aria-label": "昵称",
+  });
+  nameInput.addEventListener("change", () => {
+    const newName = nameInput.value.trim().replace(/\s+/g, " ").slice(0, 24);
+    if (!newName) {
+      nameInput.value = state.me?.name || storedName() || "";
+      return;
+    }
+    saveName(newName);
+    if (state.me) state.me.name = newName;
+    state.ws?.send("rename", { name: newName });
+    toast("昵称已更新", { type: "success" });
+  });
   const nameRow = el(
     "div",
-    { class: "settings-row" },
+    { class: "settings-row settings-name-row" },
     el("div", { class: "settings-label", text: "昵称" }),
-    el("div", { class: "settings-value", text: state.me?.name || storedName() }),
+    nameInput,
   );
   const roomRow = el(
     "div",

@@ -30,10 +30,6 @@ function clearBufferTimer(room) {
     clearTimeout(room.bufferTimer);
     room.bufferTimer = null;
   }
-  if (room.bufferingCheckTimer) {
-    clearTimeout(room.bufferingCheckTimer);
-    room.bufferingCheckTimer = null;
-  }
 }
 
 function broadcastPlayback(room, action, extra = {}) {
@@ -101,9 +97,9 @@ function maybeAutoWait(room) {
 export function attachWebSocket(server, { rooms, resolvedStore }) {
   const wss = new WebSocketServer({
     noServer: true,
-    // 字幕（VTT）可能上百 KB；JSON 还会转义换行。2MB 足够覆盖常见字幕，
-    // 同时聊天/信令仍然受下面的 rate limiter 约束。
-    maxPayload: 2 * 1024 * 1024,
+    // 字幕（VTT）可能上百 KB，96KB 的 payload 上限会让整部剧的字幕
+    // 根本传不上去。聊天/信令都很小，放到 1MB 不影响限流效果。
+    maxPayload: 1024 * 1024,
     perMessageDeflate: false,
   });
   const limiter = new RateLimiter({ windowMs: 10_000, max: 80 });
@@ -249,7 +245,6 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
             duration: null,
             localPath: null,
           });
-          clearBufferTimer(room);
           room.play(0);
           broadcast(room, {
             type: "video",
@@ -386,16 +381,12 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
               title: typeof message.title === "string" ? message.title : "",
               poster: typeof message.poster === "string" ? message.poster : "",
             });
-            // A new movie replaces the previous show, including its episode
-            // playlist; otherwise "next episode" would jump into the old show.
-            room.playlist = [];
-            room.playlistIndex = 0;
             room.setVideo(
               video,
               resolvedStore.describeSource(message.token, message.candidateId),
             );
             clearBufferTimer(room);
-            broadcast(room, { type: "video", video, playlist: null });
+            broadcast(room, { type: "video", video });
             broadcastPlayback(room, "video");
             const chat = room.addSystem(`${member.name} 添加了《${video.title}》`);
             broadcast(room, { type: "chat", message: chat });
@@ -413,6 +404,14 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
             room.settings.controlMode = settings.controlMode;
           }
           broadcast(room, { type: "settings", settings: room.settings });
+          break;
+        }
+
+        case "rename": {
+          const name = String(message.name || "").trim().replace(/\s+/g, " ").slice(0, 24);
+          if (!name) return;
+          member.name = name;
+          broadcastMembers(room);
           break;
         }
 
@@ -550,17 +549,14 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
         }
 
         case "subtitle": {
-          // 字幕是房间级状态，和播放控制一样受 host/shared 权限约束；
-          // 否则访客可以在 host 模式下覆盖所有人的字幕。
-          if (!canControl()) return;
           const vtt = String(message.vtt || "");
           if (!vtt) {
             room.subtitle = null;
             broadcast(room, { type: "subtitle", subtitle: null });
             break;
           }
-          if (Buffer.byteLength(vtt, "utf8") > 1024 * 1024) {
-            send(ws, { type: "error", code: "subtitle_too_big", message: "字幕文件太大了（限制 1MB）" });
+          if (vtt.length > 900000) {
+            send(ws, { type: "error", code: "subtitle_too_big", message: "字幕文件太大了" });
             break;
           }
           room.subtitle = {
@@ -608,10 +604,6 @@ export function attachWebSocket(server, { rooms, resolvedStore }) {
 
         // 主持人批准/拒绝后，把结果回给提出申请的观众。
         case "controlResponse": {
-          if (!member.isHost) {
-            send(ws, { type: "error", code: "host_only", message: "只有主持人可以处理这个请求" });
-            break;
-          }
           const target = message.to ? room.members.get(String(message.to)) : null;
           if (!target || !target.ws || target.ws.readyState !== 1) break;
           send(target.ws, {

@@ -23,10 +23,22 @@ function normalizePoster(value, apiUrl) {
   return /^https?:\/\//i.test(absolute) ? absolute.slice(0, 2048) : "";
 }
 
+const isDirectM3u8 = (url) => /\.m3u8(?:$|[?#])/i.test(url);
+
 function parseEpisodes(item, apiUrl) {
   const names = String(item.vod_play_from || "").split("$$$");
   const groups = String(item.vod_play_url || "").split("$$$");
-  const episodes = [];
+  // 一批采集站（红牛/急速/豪华/速播/光速等）的 vod_play_url 给的是
+  // DPlayer 播放页（/play/<id>），页面里 const vid 指向的真实地址就是
+  // 页面地址后面拼 /index.m3u8（标准 AES-128 HLS，播放器原生支持）。
+  // 量子这类站则给的是 v.lzcdn*.com/share/<id> 分享页——不是直链，浏览器
+  // 放不出来。这里把能直接播放的 .m3u8 地址整体前置，share/播放页往后排，
+  // 保证默认选中的第 1 集、默认高亮的源都是真能放的直链（前端按 group 分栏
+  // 展示，顺序变化不影响分栏，只影响默认集）。
+  const direct = [];
+  const fallback = [];
+  const MAX = 120;
+  let total = 0;
   groups.forEach((group, groupIndex) => {
     for (const rawEntry of group.split("#")) {
       const entry = rawEntry.trim();
@@ -40,21 +52,20 @@ function parseEpisodes(item, apiUrl) {
         url = absolute;
       }
       if (!/^https?:\/\//i.test(url)) continue;
-      // 一批采集站（红牛/急速/豪华/速播/光速等）的 vod_play_url 给的是
-      // DPlayer 播放页（/play/<id>），页面里 const vid 指向的真实地址就是
-      // 页面地址后面拼 /index.m3u8（标准 AES-128 HLS，播放器原生支持）。
       const playPage = url.match(/^(https?:\/\/[^/]+\/play\/[A-Za-z0-9]+)\/?$/);
       if (playPage) url = `${playPage[1]}/index.m3u8`;
-      if (!name) name = `第 ${episodes.length + 1} 集`;
-      episodes.push({
-        name: cleanText(name, 60) || `第 ${episodes.length + 1} 集`,
+      if (!name) name = `第 ${total + 1} 集`;
+      const ep = {
+        name: cleanText(name, 60) || `第 ${total + 1} 集`,
         url,
         group: cleanText(names[groupIndex] || "默认源", 30),
-      });
-      if (episodes.length >= 120) break;
+      };
+      (isDirectM3u8(url) ? direct : fallback).push(ep);
+      total += 1;
+      if (total >= MAX) break;
     }
   });
-  return episodes;
+  return [...direct, ...fallback];
 }
 
 export class Discovery {

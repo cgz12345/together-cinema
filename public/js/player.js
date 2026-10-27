@@ -419,9 +419,7 @@ export class Player {
     if (!this.videoData || !this.proxySrc || !this.usingDirect) return;
     const time = this.video.currentTime || 0;
     const wasPlaying = !this.video.paused;
-    // Live channels usually have no CORS. A failed direct attempt there is
-    // expected, so don't interrupt the viewer with a toast before falling back.
-    if (!this.videoData.isLive) this.callbacks.onTransientError?.(message);
+    this.callbacks.onTransientError?.(message);
     this.usingDirect = false;
     const data = this.videoData;
     this.load(data, { forceProxy: true }).then(() => {
@@ -431,21 +429,20 @@ export class Player {
   }
 
   initHls(videoData) {
-    const isLive = Boolean(videoData.isLive);
     const hls = new Hls({
       enableWorker: true,
       lowLatencyMode: false,
       capLevelToPlayerSize: false,
       startLevel: -1,
-      maxBufferLength: isLive ? 24 : 40,
-      maxMaxBufferLength: isLive ? 48 : 90,
-      backBufferLength: isLive ? 10 : 60,
+      maxBufferLength: 40,
+      maxMaxBufferLength: 90,
+      backBufferLength: 60,
       abrEwmaDefaultEstimate: 8_000_000,
       manifestLoadingTimeOut: 25000,
       levelLoadingTimeOut: 25000,
       fragLoadingTimeOut: 35000,
-      liveSyncDurationCount: isLive ? 2 : 3,
-      liveMaxLatencyDurationCount: isLive ? 5 : 8,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 8,
     });
     this.hls = hls;
     hls.attachMedia(this.video);
@@ -631,6 +628,9 @@ export class Player {
       this.pendingPlayback = { playback, initial };
       return;
     }
+    // 直播源本身就是同步的：host 的播放/暂停/倍速不该强加给同伴，谁卡住
+    // 谁本地停，互不干扰。位置同步本就早退，这里连 playing/rate 一起挡掉。
+    if (this.videoData.isLive) return;
     const playing = Boolean(playback.playing);
     const rate = clamp(Number(playback.rate) || 1, 0.25, 3);
     const target = this.targetPosition(playback);
@@ -669,6 +669,8 @@ export class Player {
 
   applySync(playback, { force = false } = {}) {
     if (!playback || !this.videoData || !this.manifestReady) return;
+    // 直播态：节目源已同步，不强制对齐播放/进度/倍速（playing 同步在下面，先挡掉）
+    if (this.videoData.isLive) return;
     const video = this.video;
     const rate = clamp(Number(playback.rate) || 1, 0.25, 3);
     const playing = Boolean(playback.playing);

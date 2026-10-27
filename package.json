@@ -5,6 +5,18 @@
   "license": "MIT",
   "type": "module",
   "description": "Self-hosted two-person cinema: stream sniffing, synced playback, chat, live TV, voice and PWA.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.3"
+  },
   "keywords": [
     "watch-party",
     "video",
@@ -19,17 +31,5 @@
   },
   "bugs": {
     "url": "https://github.com/cgz12345/together-cinema/issues"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js",
-    "test": "node --test test/*.test.js"
-  },
-  "dependencies": {
-    "express": "^4.21.2",
-    "ws": "^8.18.3"
   }
 }

@@ -248,9 +248,6 @@ export function refreshRoomVideo(room, store) {
   try {
     const session = store.create({ ...source });
     video.src = store.entryPath(session.id);
-    // Keep the direct-play URL in sync as well: signed/proxied URLs may be
-    // refreshed, while direct mode bypasses the proxy entirely.
-    video.directSrc = source.url || null;
     return true;
   } catch {
     return false;

@@ -64,8 +64,6 @@ ALLOW_PRIVATE_URLS=1 npm start
 | `MAX_UPLOAD_BYTES` | `6291456` | 聊天图片最大字节数 |
 | `ICE_SERVERS` | 公共 STUN | WebRTC ICE 配置 JSON；严格 NAT 建议加 TURN |
 | `SNIFFER_URL` | 空 | 可选的外部浏览器嗅探服务地址 |
-| `BUILTIN_LIVE_LIST` | 空 | 留空使用内置精选 CORS 直连频道；填入 m3u 地址则改为导入外部列表 |
-| `BUILTIN_LIVE_NAME` | `内置 · 精选直连` | 内置直播源显示名称 |
 | `MERGE_ENABLED` | `0` | 预留：高清合并（未启用） |
 
 ## 部署（Ubuntu + systemd + Caddy）
@@ -163,13 +161,7 @@ Caddy 会自动申请 Let's Encrypt 证书。确认 80/443 端口在云厂商安
 
 “看电视”里可以粘贴 m3u 文本、填写列表链接或添加单个频道。频道列表存在 `DATA_DIR/live-sources.json`，不上传到第三方。直播不支持倍速和精确拖动。
 
-首次打开且没有任何直播源时，会自动加载内置的 **精选直连频道**：CCTV-13、CCTV-14、东方卫视国际、广东卫视、河北卫视、浙江国际、西藏卫视、内蒙古卫视和几个地方新闻/影视频道。这些源都已实测 HTTPS、CORS 和首个分片可直连，正常情况不经过服务器代理。
-
-也可以用环境变量换成完整的第三方 m3u 列表。列表里如果存在 HTTP/CORS 受限频道，会自动回退代理：
-
-```env
-BUILTIN_LIVE_LIST=https://example.com/iptv/cn.m3u
-```
+“看电视”的导入弹窗里提供几个内置公开 IPTV 列表（中国央视/香港/台湾、Fanmingming 精选），一键抓取并导入成自己的直播源，不会预置一堆可能失效的频道。HTTPS 且允许 CORS 的频道默认直连；HTTP 或防盗链频道自动回退代理。
 
 主输入框也支持直播：直接粘贴 m3u8、直播页链接，或没有后缀的直播地址（服务端会尝试把输入地址当作媒体流探测）。
 

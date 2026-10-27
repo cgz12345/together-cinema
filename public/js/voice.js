@@ -66,7 +66,6 @@ export class VoiceChat {
       const peer = this.ensurePeer(from);
       try {
         await peer.pc.setRemoteDescription(data.sdp);
-        await this.flushCandidates(peer);
         const answer = await peer.pc.createAnswer();
         await peer.pc.setLocalDescription(answer);
         this.send("voiceSignal", { to: from, data: { type: "answer", sdp: answer } });
@@ -77,30 +76,12 @@ export class VoiceChat {
     }
     if (data.type === "answer") {
       const peer = this.peers.get(from);
-      if (peer) {
-        await peer.pc.setRemoteDescription(data.sdp).catch(() => {});
-        await this.flushCandidates(peer);
-      }
+      if (peer) await peer.pc.setRemoteDescription(data.sdp).catch(() => {});
       return;
     }
     if (data.type === "candidate" && data.candidate) {
       const peer = this.peers.get(from);
-      if (!peer) return;
-      // Trickle candidates can arrive before the offer/answer. Adding them
-      // immediately throws InvalidStateError and loses the candidate, which
-      // breaks calls on NATs that rely on those host/srflx candidates.
-      if (!peer.pc.remoteDescription) {
-        peer.pendingCandidates.push(data.candidate);
-        return;
-      }
-      await peer.pc.addIceCandidate(data.candidate).catch(() => {});
-    }
-  }
-
-  async flushCandidates(peer) {
-    const pending = peer.pendingCandidates.splice(0);
-    for (const candidate of pending) {
-      await peer.pc.addIceCandidate(candidate).catch(() => {});
+      if (peer) await peer.pc.addIceCandidate(data.candidate).catch(() => {});
     }
   }
 
@@ -120,7 +101,7 @@ export class VoiceChat {
     audio.style.display = "none";
     document.body.appendChild(audio);
 
-    const peer = { pc, audio, pendingCandidates: [] };
+    const peer = { pc, audio };
     this.peers.set(id, peer);
 
     if (this.stream) {

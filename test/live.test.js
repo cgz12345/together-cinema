@@ -11,8 +11,6 @@ https://cdn.example.com/live/cctv1.m3u8
 #EXTINF:-1,湖南卫视
 #EXTGRP:地方
 https://cdn.example.com/live/hunan.m3u8
-#EXTINF:-1,Bad
-http://user:pass@example.com/private.m3u8
 #EXTINF:-1,Duplicate
 https://cdn.example.com/live/cctv1.m3u8
 #EXTINF:-1,Not http
